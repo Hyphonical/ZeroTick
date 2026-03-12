@@ -1,0 +1,63 @@
+[package]
+name         = "zerotick"
+version      = "0.1.0"
+edition      = "2024"
+rust-version = "1.87.0"
+authors      = ["Hyphonical"]
+license      = "MIT"
+repository   = "https://github.com/Hyphonical/ZeroTick"
+description  = "Minecraft server reconnaissance tool"
+
+[[bin]]
+name = "zerotick"
+path = "src/main.rs"
+
+[dependencies]
+# ── Async runtime ──────────────────────────────────────
+tokio = { version = "1", features = ["full"] }
+
+# ── CLI ────────────────────────────────────────────────
+clap = { version = "4", features = ["derive"] }
+
+# ── Logging ────────────────────────────────────────────
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# ── Display ────────────────────────────────────────────
+colored = "3"
+indicatif = "0.18"
+
+# ── Serialization (SLP JSON response, Mojang API) ──────
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# ── TLS (Mojang API over HTTPS) ────────────────────────
+tokio-rustls = "0.26"
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std"] }
+webpki-roots = "1.0.6"
+
+# ── Utilities ───────────────────────────────────────────
+base64 = "0.22"
+sha1 = "0.10"
+thiserror = "2"
+rand = "0.10.0"
+
+[profile.release.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level     = 3
+lto           = "fat"
+codegen-units = 1
+strip         = "debuginfo"
+panic         = "unwind"
+
+[profile.fast]
+inherits      = "release"
+opt-level     = 3
+debug         = 0
+codegen-units = 32
+incremental   = true
+lto           = "off"
+panic         = "abort"
+strip         = false

@@ -1,0 +1,54 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: 🚧 Windows x86_64
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: 📦 Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: windows-x86_64-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: 🚧 Build Release
+        run: cargo build --release --all-features --target x86_64-pc-windows-msvc
+
+      - name: 📦 Stage Files
+        run: |
+          mkdir dist
+          copy target\x86_64-pc-windows-msvc\release\zerotick.exe dist\
+          copy LICENSE dist\
+          copy README.md dist\
+
+      - name: 📤 Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: zerotick-windows-x64
+          path: dist/*
+          compression-level: 9
+          if-no-files-found: error
+          retention-days: 7
