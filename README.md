@@ -1,10 +1,9 @@
 
 # ZeroTick ⚡
 
-**Minecraft server reconnaissance from the command line.**
+**Minecraft server reconnaissance that doesn't mess around.**
 
-Ping servers, pull their status, see who's playing, check if they're blocked by Mojang —
-all from raw protocol. No game client, no mods, no auth. Just TCP and curiosity.
+Query any server's status or scan entire IP ranges for Minecraft servers. No Java, no Minecraft client, no bloated dependencies. Just a single binary, raw protocol packets, and styled terminal output.
 
 ## Table of Contents
 
@@ -13,94 +12,64 @@ all from raw protocol. No game client, no mods, no auth. Just TCP and curiosity.
 - [Features](#features-)
 - [Quick Start](#quick-start-)
 - [Usage](#usage)
-  - [`status` — Query a Server](#status--query-a-server)
-  - [`scan` — Scan an IP Range](#scan--scan-an-ip-range)
+  - [`status` - Query a Server](#status---query-a-server)
+  - [`scan` - Scan IP Ranges](#scan---scan-ip-ranges)
   - [Global Options](#global-options)
 - [How It Works](#how-it-works-)
-- [Platform Support](#platform-support)
-- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## What's This About?
 
-You ever wonder what's running on `play.someserver.net`? What version, how many
-players, what the MOTD says, whether the server is on Mojang's blocklist?
+You know when you vaguely remember the IP of a Minecraft server you played on three years ago, or you want to see what's running on your local network, or you just want to check if Hypixel is having a moment? That's ZeroTick.
 
-Sure, you could open Minecraft, add it to your server list, squint at the tiny
-tooltip, and hope the UI gives you everything. Or you could type:
+Type `zerotick status mc.hypixel.net` and you get version, player count, MOTD, latency, secure chat status, Mojang blocked status — the works. All rendered in a clean tree layout with proper Minecraft color codes. Or point `zerotick scan` at a CIDR range and find every Minecraft server hiding on a subnet in seconds.
 
-```bash
-zerotick status mc.hypixel.net
-```
-
-And get the full picture in your terminal, color-coded and formatted, in under a
-second. Version, protocol, player list, latency, mod loader, secure chat status,
-Mojang block status — everything the protocol exposes.
-
-Oh, and if you're *really* curious, you can point it at an entire subnet:
-
-```bash
-zerotick scan 192.168.1.0/24
-```
-
-It'll probe every address for a Minecraft server and show you what it finds.
-Politely. With rate limiting. We're not animals.
+ZeroTick speaks the Minecraft protocol natively — both the modern Server List Ping (1.7+) and the legacy protocol (≤1.6). It resolves SRV records, checks Mojang's blocked server list, and even looks up player skin URLs. All from a ~3MB binary.
 
 ## Why Does This Exist?
 
-Honestly? I wanted to know what was out there.
+There are other Minecraft ping tools out there. Most of them are Python scripts that take 4 seconds to query a single server, or web apps that route your requests through someone else's infrastructure, or Java programs that somehow need 200MB of RAM to send two packets.
 
-There are web-based Minecraft server status checkers, sure. They work fine for one
-server at a time if you don't mind the ads and the five-second loading spinner for
-what is fundamentally a single TCP handshake.
+I wanted something **instant**, **offline**, and **unix-philosophy friendly**. Something that starts up in milliseconds, gives me exactly the information I need, and doesn't phone home. Also, implementing the Minecraft protocol from scratch in Rust sounded like a fun weekend project. (It was not a weekend project.)
 
-I wanted something **fast**, something I could script, something that didn't phone
-home or require a browser. And I wanted to learn how the Minecraft protocol actually
-works at the byte level — turns out it's a neat little VarInt-framed protocol that's
-fun to implement from scratch.
-
-So here's ZeroTick. Zero external APIs for the core functionality (the Mojang API
-is optional, for blocklist checks and player skins). Zero bloat. Just you and the
-wire.
-
-Built in Rust because I like my tools compiled, single-binary, and unreasonably fast. ⚡
+The scanner specifically exists because sometimes you inherit a network and need to know "is anyone running unauthorized game servers on this subnet?" The answer is usually yes. Now you can find them in under a minute.
 
 ## Features 🎯
 
-- **📡 Server List Ping** — full SLP handshake, modern protocol (1.7+) and legacy fallback
-- **⏱️ Latency measurement** — real protocol-level ping/pong, not ICMP
-- **👥 Player list** — online count, max, and the sample player list with UUIDs
-- **📝 MOTD rendering** — Minecraft chat components rendered as ANSI-colored terminal text
-- **🔒 Secure chat detection** — shows whether the server enforces signed messages
-- **🧩 Mod detection** — identifies Forge/NeoForge/Fabric from the SLP response
-- **🚫 Mojang blocklist check** — SHA-1 hash check against the official blocked servers list
-- **🎨 Player profiles** — skin URLs and capes via the Mojang session API
-- **🌐 DNS SRV resolution** — handles `_minecraft._tcp` records automatically
-- **🔍 Range scanning** — probe entire CIDR ranges for Minecraft servers
-- **⚡ Async I/O** — thousands of concurrent connections with configurable rate limiting
-- **🎨 Styled output** — clean, color-coded terminal display with tree and table views
-- **🖥️ Cross-platform** — Windows, macOS, Linux, every major terminal
+- **🏓 Server List Ping**: Full modern SLP (1.7+) with JSON status, latency measurement, and ping/pong
+- **👴 Legacy support**: Falls back to the ≤1.6 protocol for ancient servers
+- **🔍 Mass scanning**: Scan entire CIDR ranges with configurable concurrency and rate limiting
+- **🌐 SRV resolution**: Automatically resolves `_minecraft._tcp` DNS SRV records
+- **🎨 MOTD rendering**: Full Minecraft chat component parsing with `§` codes and hex colors
+- **🚫 Blocked check**: Checks addresses against Mojang's SHA-1 blocked servers list
+- **👤 Player profiles**: Looks up skin/cape URLs for players in the sample list
+- **🔒 Secure chat**: Shows whether the server enforces secure chat
+- **⚡ Rate limiting**: Token-bucket rate limiter to avoid melting your router
+- **📊 Styled output**: Clean tree and table renderers with a consistent color palette
+- **📈 Progress bars**: Real-time scanning progress with live discovery count
+- **🔇 Clean stderr/stdout**: Logs go to stderr, styled output to stdout — pipe-friendly
+- **🦀 Single binary**: No runtime dependencies, no JVM, no Python, no Docker
 
 ## Quick Start 🚀
 
-### Build from source
+### Install
 
 ```bash
-git clone https://github.com/yourname/zerotick.git
-cd zerotick
+git clone https://github.com/yourusername/ZeroTick.git
+cd ZeroTick
 cargo build --release
 ```
 
-Binary lands at `target/release/zerotick` (or `zerotick.exe` on Windows).
+Binary at `target/release/zerotick` (or `zerotick.exe` on Windows).
 
-### Query a server
+### Query a Server
 
 ```bash
 zerotick status mc.hypixel.net
 ```
 
-```text
+```
 ● mc.hypixel.net:25565
  ├─ Version    1.8-1.21.4 (769)
  ├─ Latency    23ms
@@ -108,24 +77,25 @@ zerotick status mc.hypixel.net
  │   ├─ Technoblade
  │   ├─ Dream
  │   ╰─ … 42,067 more
- ├─ MOTD       Hypixel Network [1.8-1.21]
- │              SUMMER EVENT
+ ├─ MOTD       Hypixel Network
+ │              SUMMER EVENT + 50% OFF SALE
  ├─ Secure     enforced
- ╰─ Blocked    no
+ ├─ Blocked    no
+ ╰─ Favicon    64×64 embedded (~5,432 bytes)
 ```
 
-### Scan a range
+### Scan a Subnet
 
 ```bash
 zerotick scan 192.168.1.0/24
 ```
 
-```text
-● Scan 192.168.1.0/24:25565  (256 addresses)
-  · Rate        1000/s
-  · Timeout     3000ms
+```
+● Scan: 192.168.1.0/24:25565  (256 addresses)
+  · Rate       1000/s
+  · Timeout    3000ms
 
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  256/256
+  ━━━━━━━━━━━━━━━━━━━━╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌  256/256 00:00:04 elapsed
 
 ✓ 3 servers found
 
@@ -140,143 +110,124 @@ zerotick scan 192.168.1.0/24
 
 ## Usage
 
-### `status` — Query a Server
+### `status` - Query a Server
 
 ```bash
 zerotick status <ADDRESS> [OPTIONS]
+
+Arguments:
+  <ADDRESS>                     Server address (ip, ip:port, or domain)
+
+Options:
+  -t, --timeout <MS>            Connection timeout in milliseconds [default: 5000]
 ```
 
-| Flag | Default | Description |
-|---|---|---|
-| `<ADDRESS>` | *required* | Server address — `ip`, `ip:port`, `domain`, or `domain:port` |
-| `-t, --timeout <MS>` | `5000` | Connection timeout in milliseconds |
+Queries a single Minecraft server and displays everything it knows. Tries the modern SLP protocol first, falls back to legacy if that fails. Resolves SRV records automatically for domains. Checks Mojang's blocked servers list. Looks up player profiles for skin/cape info.
 
-Queries a single Minecraft server using the Server List Ping protocol. Automatically
-resolves DNS SRV records for domain names. Falls back to the legacy ping protocol
-for servers older than 1.7.
+**Examples:**
 
 ```bash
-# Domain (SRV lookup + default port 25565)
+# Domain with default port
 zerotick status mc.hypixel.net
 
-# Explicit IP and port
-zerotick status 192.168.1.10:25565
+# Explicit port
+zerotick status play.example.com:25566
 
-# Shorter timeout for LAN servers
-zerotick status 10.0.0.5 -t 1000
+# Direct IP
+zerotick status 192.168.1.100
+
+# Short timeout for quick checks
+zerotick status some.server.com -t 2000
 ```
 
-### `scan` — Scan an IP Range
+> [!TIP]
+> You don't need to specify `:25565` — ZeroTick uses the default Minecraft port automatically and checks SRV records for domains.
+
+### `scan` - Scan IP Ranges
 
 ```bash
 zerotick scan <RANGE> [OPTIONS]
+
+Arguments:
+  <RANGE>                       CIDR range (e.g. 192.168.1.0/24)
+
+Options:
+  -p, --port <PORT>             Target port [default: 25565]
+  -c, --concurrency <N>         Maximum concurrent connections [default: 256]
+  -t, --timeout <MS>            Connection timeout in milliseconds [default: 3000]
+  --rate <N>                    Maximum new connections per second [default: 1000]
 ```
 
-| Flag | Default | Description |
-|---|---|---|
-| `<RANGE>` | *required* | CIDR notation, e.g. `192.168.1.0/24` |
-| `-p, --port <PORT>` | `25565` | Target port |
-| `-c, --concurrency <N>` | `256` | Maximum concurrent connections |
-| `-t, --timeout <MS>` | `3000` | Per-connection timeout |
-| `--rate <N>` | `1000` | Maximum new connections per second |
+Scans an entire IP range for Minecraft servers. Addresses are probed in **randomized order** to avoid sequential scanning patterns. Uses a semaphore for concurrency control and a token-bucket rate limiter so you don't accidentally DoS your own network.
 
-Probes every address in the given CIDR range for a Minecraft server. Connections are
-rate-limited and concurrent, so it's fast but not aggressive. Scan order is randomized
-to avoid hammering sequential address blocks.
+**Examples:**
 
 ```bash
-# Scan a /24 on the default port
+# Scan a /24 subnet
 zerotick scan 192.168.1.0/24
 
-# Scan a /16 slowly and carefully
-zerotick scan 10.0.0.0/16 --rate 200 -c 64 -t 2000
-
 # Non-standard port
-zerotick scan 172.16.0.0/24 -p 25566
+zerotick scan 10.0.0.0/16 -p 25566
+
+# Aggressive scan (local network)
+zerotick scan 192.168.0.0/16 -c 512 --rate 5000 -t 1000
+
+# Gentle scan (remote, don't get banned)
+zerotick scan 203.0.113.0/24 -c 32 --rate 100 -t 5000
 ```
 
 > [!CAUTION]
-> Scanning IP ranges you don't own may violate your ISP's terms of service or local laws.
-> ZeroTick is a tool — what you point it at is your responsibility.
+> Scanning networks you don't own or have permission to scan may violate laws and terms of service. ZeroTick is a network reconnaissance tool — use it responsibly and only on networks where you have authorization.
+
+> [!NOTE]
+> The maximum supported range is `/8` (16M addresses). For anything larger, break it into multiple scans. A `/24` (256 addresses) typically completes in under 5 seconds. A `/16` (65K addresses) takes about a minute depending on your settings.
 
 ### Global Options
 
-| Flag | Description |
-|---|---|
-| `-v` | Verbose logging (`info` level) |
-| `-vv` | Debug logging |
-| `-vvv` | Trace logging (very noisy) |
-| `--version` | Print version |
-| `--help` | Print help |
+```bash
+-v, --verbose                   Increase log verbosity (-v info, -vv debug, -vvv trace)
+```
 
-Logs go to **stderr**. Styled output goes to **stdout**. So you can do things like:
+Logs are written to **stderr**, styled output to **stdout**. This means you can pipe ZeroTick's output without log noise getting in the way.
 
 ```bash
-# Suppress logs, keep only the pretty output
-zerotick status mc.hypixel.net 2>/dev/null
-
-# Debug a connection issue
+# See what's happening under the hood
 zerotick -vv status mc.hypixel.net
+
+# Full trace logging for debugging protocol issues
+zerotick -vvv status some.broken.server.com
 ```
 
 ## How It Works 🧠
 
-ZeroTick speaks the Minecraft protocol directly — no libraries, no wrappers. Here's
-what happens when you run `zerotick status`:
+1. **Address resolution**: Parses the input, checks for explicit ports, queries DNS SRV records for `_minecraft._tcp.<domain>`
+2. **TCP connect**: Opens an async connection with configurable timeout
+3. **Handshake**: Sends a Minecraft protocol handshake packet (VarInt-encoded, length-prefixed)
+4. **Status request**: Sends the status request packet, reads the JSON response
+5. **Ping/pong**: Measures round-trip latency with a timestamp ping
+6. **Mojang checks**: Fetches the blocked servers list over HTTPS, hashes the address with SHA-1
+7. **Profile lookups**: For players in the sample list, fetches skin/cape URLs from the session server
+8. **Rendering**: Parses Minecraft chat components, maps `§` codes and named colors to ANSI, outputs styled trees and tables
 
-1. **Resolve** — parse the address, check for a `_minecraft._tcp` DNS SRV record
-2. **Connect** — open a TCP connection with a configurable timeout
-3. **Handshake** — send a Minecraft handshake packet (VarInt-encoded, protocol version, target address, next-state = Status)
-4. **Status Request** — send an empty `0x00` packet
-5. **Status Response** — receive and parse the JSON blob (version, players, MOTD, favicon, mods, secure chat flag)
-6. **Ping** — send a `0x01` packet with a timestamp, measure round-trip
-7. **Mojang Check** *(optional)* — SHA-1 hash the server address, compare against Mojang's blocklist over HTTPS
-8. **Render** — format everything into a styled tree and print to stdout
+For scanning, steps 2-5 run concurrently across hundreds of async tasks, coordinated by a semaphore and rate limiter.
 
-The entire exchange is ~4 packets. On a LAN server, the whole thing takes single-digit
-milliseconds.
-
-For legacy servers (pre-1.7), ZeroTick falls back to the `0xFE 0x01` legacy ping,
-which returns a UTF-16BE string instead of JSON. Less data, but still gets you
-version, MOTD, and player count.
-
-## Platform Support
-
-| OS | Terminal | Status |
-|---|---|---|
-| Linux | Alacritty, Kitty, GNOME Terminal, foot, any VTE-based | ✓ |
-| macOS | Terminal.app, iTerm2, Alacritty, Kitty | ✓ |
-| Windows | Windows Terminal, ConEmu, Alacritty | ✓ |
-| Windows | Legacy `cmd.exe` / PowerShell < 7 | ⚠ colors may not render |
-
-ZeroTick uses 24-bit TrueColor ANSI. If your terminal was released after 2016,
-you're fine.
-
-## Roadmap
-
-- [x] Modern SLP (1.7+)
-- [x] Legacy SLP (≤1.6)
-- [x] DNS SRV resolution
-- [x] MOTD → ANSI rendering
-- [x] Mojang blocklist check
-- [x] Player profile / skin lookup
-- [x] CIDR range scanner
-- [ ] UDP Query protocol (full player list, map name, plugins)
-- [ ] Bedrock / MCPE ping (RakNet)
-- [ ] RCON client
-- [ ] Favicon → terminal pixel art
-- [ ] JSON export
-- [ ] Server software fingerprinting heuristics
+Everything uses raw TCP and the actual Minecraft wire protocol — no libraries abstracting it away. The HTTPS client is a minimal implementation on top of `rustls` that speaks just enough HTTP/1.1 to talk to Mojang's API.
 
 ## Contributing
 
-PRs welcome. If you find a server that returns something ZeroTick doesn't parse
-correctly, open an issue with the raw JSON and I'll fix it.
+PRs welcome! The codebase is organized into clean modules:
+
+- `protocol/` — VarInt codec, packet framing, SLP implementations
+- `net/` — Address resolution, HTTPS client
+- `mojang/` — Blocked server checks, player profiles
+- `scanner/` — CIDR parsing, async probe workers
+- `style/` — MOTD rendering, tree/table output, color palette
+- `commands/` — CLI command orchestration
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-Built with Rust, TCP, and an unreasonable interest in Minecraft server metadata. ⚡
+Made with ☕ and raw TCP packets. If you've ever wondered "what's running on port 25565?", now you know.
