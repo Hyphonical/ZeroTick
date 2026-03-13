@@ -36,6 +36,7 @@ async fn main() {
 
 	let result = match cli.command {
 		cli::Command::Status { address, timeout } => commands::status::run(&address, timeout).await,
+		cli::Command::Serve { host, port } => commands::serve::run(&host, port).await,
 		cli::Command::Scan {
 			range,
 			port,
