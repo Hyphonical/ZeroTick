@@ -41,10 +41,10 @@ base64 = "0.22"
 sha1 = "0.10"
 thiserror = "2"
 rand = "0.10.0"
-axum = "0.8.8"
-tower-http = "0.6.8"
-tower = "0.5.3"
-dashmap = "6.1.0"
+axum = { version = "0.8", features = ["json"] }
+tower-http = "0.6"
+tower = "0.5"
+dashmap = "6.1"
 
 [profile.release.package."*"]
 opt-level = 3

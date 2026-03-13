@@ -111,8 +111,20 @@ pub async fn run(host: &str, port: u16) -> Result<()> {
 		rate_limiter: DashMap::new(),
 	});
 
+	let state_for_cleanup = state.clone();
+	tokio::spawn(async move {
+		loop {
+			tokio::time::sleep(Duration::from_secs(60)).await;
+			// Simple cleanup: clear everything every minute to prevent unbounded growth.
+			// In a real production app, we'd use a TTL cache.
+			state_for_cleanup.cache.clear();
+			state_for_cleanup.rate_limiter.clear();
+			tracing::debug!("ZeroTick serve: cleared cache and rate limiter");
+		}
+	});
+
 	let app = Router::new()
-		.route(&route, get(handle_java_status))
+		.route(&route.replace("{address}", ":address"), get(handle_java_status))
 		.with_state(state);
 
 	let addr = format!("{}:{}", host, port);
@@ -326,36 +338,64 @@ fn description_to_html(desc: &Description) -> String {
 }
 
 fn motd_to_html(input: &str) -> String {
-	// Minecraft legacy colors to CSS
 	let mut out = String::from("<span>");
 	let mut chars = input.chars().peekable();
+
+	let mut color: Option<&str> = None;
+	let mut bold = false;
+	let mut strike = false;
+	let mut underline = false;
+	let mut italic = false;
+
 	while let Some(ch) = chars.next() {
 		if ch == '\u{00A7}' {
 			if let Some(code) = chars.next() {
-				out.push_str("</span><span style=\"");
 				match code {
-					'0' => out.push_str("color: #000000;"),
-					'1' => out.push_str("color: #0000AA;"),
-					'2' => out.push_str("color: #00AA00;"),
-					'3' => out.push_str("color: #00AAAA;"),
-					'4' => out.push_str("color: #AA0000;"),
-					'5' => out.push_str("color: #AA00AA;"),
-					'6' => out.push_str("color: #FFAA00;"),
-					'7' => out.push_str("color: #AAAAAA;"),
-					'8' => out.push_str("color: #555555;"),
-					'9' => out.push_str("color: #5555FF;"),
-					'a' => out.push_str("color: #55FF55;"),
-					'b' => out.push_str("color: #55FFFF;"),
-					'c' => out.push_str("color: #FF5555;"),
-					'd' => out.push_str("color: #FF55FF;"),
-					'e' => out.push_str("color: #FFFF55;"),
-					'f' => out.push_str("color: #FFFFFF;"),
-					'l' => out.push_str("font-weight: bold;"),
-					'm' => out.push_str("text-decoration: line-through;"),
-					'n' => out.push_str("text-decoration: underline;"),
-					'o' => out.push_str("font-style: italic;"),
-					'r' => {} // Reset
+					'0' => color = Some("#000000"),
+					'1' => color = Some("#0000AA"),
+					'2' => color = Some("#00AA00"),
+					'3' => color = Some("#00AAAA"),
+					'4' => color = Some("#AA0000"),
+					'5' => color = Some("#AA00AA"),
+					'6' => color = Some("#FFAA00"),
+					'7' => color = Some("#AAAAAA"),
+					'8' => color = Some("#555555"),
+					'9' => color = Some("#5555FF"),
+					'a' => color = Some("#55FF55"),
+					'b' => color = Some("#55FFFF"),
+					'c' => color = Some("#FF5555"),
+					'd' => color = Some("#FF55FF"),
+					'e' => color = Some("#FFFF55"),
+					'f' => color = Some("#FFFFFF"),
+					'l' => bold = true,
+					'm' => strike = true,
+					'n' => underline = true,
+					'o' => italic = true,
+					'r' => {
+						color = None;
+						bold = false;
+						strike = false;
+						underline = false;
+						italic = false;
+					}
 					_ => {}
+				}
+
+				out.push_str("</span><span style=\"");
+				if let Some(c) = color {
+					out.push_str(&format!("color: {};", c));
+				}
+				if bold {
+					out.push_str("font-weight: bold;");
+				}
+				if strike {
+					out.push_str("text-decoration: line-through;");
+				}
+				if underline {
+					out.push_str("text-decoration: underline;");
+				}
+				if italic {
+					out.push_str("font-style: italic;");
 				}
 				out.push_str("\">");
 			}
@@ -414,7 +454,14 @@ fn component_to_html(comp: &ChatComponent) -> String {
 		style.push_str("text-decoration: line-through;");
 	}
 
-	let mut out = format!("<span style=\"{}\">{}", style, comp.text);
+	let escaped_text = comp
+		.text
+		.replace('&', "&amp;")
+		.replace('<', "&lt;")
+		.replace('>', "&gt;")
+		.replace('\n', "<br>");
+
+	let mut out = format!("<span style=\"{}\">{}", style, escaped_text);
 	for child in &comp.extra {
 		out.push_str(&component_to_html(child));
 	}
