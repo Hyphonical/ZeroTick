@@ -1,6 +1,6 @@
 [package]
 name         = "zerotick"
-version      = "0.1.0"
+version      = "1.0.1"
 edition      = "2024"
 rust-version = "1.87.0"
 authors      = ["Hyphonical"]
@@ -41,6 +41,10 @@ base64 = "0.22"
 sha1 = "0.10"
 thiserror = "2"
 rand = "0.10.0"
+axum = "0.8.8"
+tower-http = "0.6.8"
+tower = "0.5.3"
+dashmap = "6.1.0"
 
 [profile.release.package."*"]
 opt-level = 3

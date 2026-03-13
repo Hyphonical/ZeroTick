@@ -43,6 +43,17 @@ pub enum Command {
 		timeout: u64,
 	},
 
+	/// Start a web server that mimics mcstatus.io API
+	Serve {
+		/// Host to bind to
+		#[arg(long, default_value = "0.0.0.0")]
+		host: String,
+
+		/// Port to bind to
+		#[arg(short, long, default_value_t = 8080)]
+		port: u16,
+	},
+
 	/// Scan an IP range for Minecraft servers
 	Scan {
 		/// CIDR range (e.g. 192.168.1.0/24)
